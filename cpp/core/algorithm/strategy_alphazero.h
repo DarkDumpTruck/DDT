@@ -17,7 +17,7 @@ namespace alphazero {
 
 using ActionType = uint8_t;
 
-/* this hyperparameter needs to be changed across different games.
+/* NOISE_ALPHA_RATIO needs to be changed across different games.
    Related papers:
    [1] Domain Knowledge in Exploration Noise in AlphaZero.
        Eric W., George D., Aaron T., Abtin M.
@@ -25,6 +25,9 @@ using ActionType = uint8_t;
        -6-hyperparameter-tuning-b1cfcbe4ca9a
 */
 const float NOISE_ALPHA_RATIO = 10.83f;
+
+const float CPUCT = 1.25;
+const float FPU_REDUCTION = 0.25;
 
 struct ValueType {
   // v should be the winrate/score for player 0.
@@ -353,18 +356,18 @@ class Algorithm {
     Context(std::unique_ptr<GameState> game_)
         : game(std::move(game_)),
           mcts(
-              /*cpuct=*/1.25,
+              /*cpuct=*/CPUCT,
               /*num_moves=*/game->Num_actions(),
               /*epsilon=*/0,
               /*root_policy_temp=*/1.4,
-              /*fpu_reduction=*/0.25) {
+              /*fpu_reduction=*/FPU_REDUCTION) {
       for (int i = 0; i < NumThreads; ++i) {
         specs[i] = std::make_unique<MCTS<GameState>>(
-            /*cpuct=*/1.25,
+            /*cpuct=*/CPUCT,
             /*num_moves=*/game->Num_actions(),
             /*epsilon=*/0,
             /*root_policy_temp=*/1.4,
-            /*fpu_reduction=*/0.25);
+            /*fpu_reduction=*/FPU_REDUCTION);
       }
     }
 
@@ -516,10 +519,6 @@ class Algorithm {
     Algorithm* base;
     MCTS<GameState> mcts;
     std::array<std::unique_ptr<MCTS<GameState>>, NumThreads> specs;
-
-    float CPUCT = 1.25;
-    float FPU_REDUCTION = 0.25;
-    int THREAD_COUNT = 4;
   };
 
   std::unique_ptr<Context> compute(const GameState& game) {

@@ -141,6 +141,20 @@ TEST(AlphaZeroTest, MctsSimpleTest2) {
 TEST(AlphaZeroTest, AlphazeroSimpleTest) {
   alphazero::Algorithm<Quoridor::GameState, 3> algorithm("testdata/quoridor_baseline.pt");
   Quoridor::GameState game;
+  
+  algorithm.init(Quoridor::CANONICAL_SHAPE, Quoridor::NUM_PLAYERS + 1, Quoridor::NUM_ACTIONS);
+  auto context = algorithm.compute(game);
+  context->step(/*iterations=*/1000);
+  auto action = context->best_move();
+
+  EXPECT_EQ(action, Quoridor::MOVE_RIGHT);
+}
+
+TEST(AlphaZeroTest, AlphazeroSimpleTest2) {
+  alphazero::Algorithm<Quoridor::GameState, 3> algorithm("testdata/quoridor_baseline.pt");
+  Quoridor::GameState game;
+  game.Move(Quoridor::MOVE_RIGHT);
+
   algorithm.init(Quoridor::CANONICAL_SHAPE, Quoridor::NUM_PLAYERS + 1, Quoridor::NUM_ACTIONS);
   auto context = algorithm.compute(game);
   context->step(/*iterations=*/1000);
