@@ -173,11 +173,16 @@ class MCTS {
 
   void process_result(const std::vector<float>& pi, ValueType value,
                       bool root_noise_enabled = false) {
+    process_result(&pi[0], pi.size(), value, root_noise_enabled);
+  }
+
+  void process_result(const float* pi, size_t sp, ValueType value,
+                      bool root_noise_enabled = false) {
     if (current_->ended) {
       value = current_->value;
     } else {
       // Rescale pi based on valid moves.
-      std::vector<float> scaled(pi.size(), 0);
+      std::vector<float> scaled(sp, 0);
       float sum = 0;
       for (auto& c : current_->children) {
         sum += pi[c.move];
@@ -373,8 +378,7 @@ class Algorithm {
 
     template <size_t N>
     void evaluate(const std::array<std::unique_ptr<GameState>, N>& games,
-                  std::vector<ValueType>& vs,
-                  std::vector<std::vector<float>>& pis) {
+                  std::vector<ValueType>& vs, at::Tensor& pis) {
       auto input = torch::zeros({(int)N, base->d1, base->d2, base->d3});
       for (int i = 0; i < N; ++i) {
         float* buffer =
@@ -385,43 +389,39 @@ class Algorithm {
       std::vector<torch::jit::IValue> inputs = {input.to(base->device)};
       auto outputs = base->model.forward(inputs).toTuple();
       auto tensor_v = torch::exp(outputs->elements()[0].toTensor()).cpu();
-      auto tensor_pi = torch::exp(outputs->elements()[1].toTensor()).cpu();
+      pis = torch::exp(outputs->elements()[1].toTensor()).cpu();
 
       vs.clear();
-      pis.clear();
       for (auto i = 0; i < N; ++i) {
         float* current_tensor_v = tensor_v.data_ptr<float>() + base->sv * i;
-        float* current_tensor_pi = tensor_pi.data_ptr<float>() + base->sp * i;
         vs.emplace_back(current_tensor_v[0], current_tensor_v[1]);
-        pis.emplace_back(current_tensor_pi, current_tensor_pi + base->sp);
       }
     }
 
-    void evaluate(const GameState& game, ValueType& v, std::vector<float>& pi) {
+    void evaluate(const GameState& game, ValueType& v, at::Tensor& pi) {
       auto input = torch::zeros({1, base->d1, base->d2, base->d3});
       game.Canonicalize(input.data_ptr<float>());
 
       std::vector<torch::jit::IValue> inputs = {input.to(base->device)};
       auto outputs = base->model.forward(inputs).toTuple();
       auto tensor_v = torch::exp(outputs->elements()[0].toTensor()).cpu();
-      auto tensor_pi = torch::exp(outputs->elements()[1].toTensor()).cpu();
+      pi = torch::exp(outputs->elements()[1].toTensor()).cpu();
 
       float* current_tensor_v = tensor_v.data_ptr<float>();
-      float* current_tensor_pi = tensor_pi.data_ptr<float>();
       v.set(current_tensor_v[0], current_tensor_v[1]);
-      pi.assign(current_tensor_pi, current_tensor_pi + base->sp);
     }
 
     void step(int iterations) {
       std::unique_lock lock(base->model_mutex);
 
-      ValueType v;
-      std::vector<float> pi;
-      mcts.find_leaf(*game);
-      evaluate(*game, v, pi);
-
       // initalize spec trees with most p-value moves.
       {
+        ValueType v;
+        at::Tensor tensor_pi;
+        mcts.find_leaf(*game);
+        evaluate(*game, v, tensor_pi);
+        const float* pi = tensor_pi.data_ptr<float>();
+
         auto& children = mcts.root_children();
         std::vector<int> idx(children.size());
         for (int i = 0; i < idx.size(); i++) idx[i] = children[i].move;
@@ -435,11 +435,11 @@ class Algorithm {
                                         node.move) != idx.begin() + NumThreads;
                            }),
             children.end());
-        mcts.process_result(pi, v);
+        mcts.process_result(pi, base->sp, v);
         for (int i = 0; i < NumThreads; i++) {
           specs[i]->root_children().emplace_back(idx[i]);
           specs[i]->root_.player = game->Current_player();
-          specs[i]->process_result(pi, v);
+          specs[i]->process_result(pi, base->sp, v);
         }
       }
 
@@ -450,19 +450,24 @@ class Algorithm {
           leaves[i] = specs[i]->find_leaf(*game);
         }
         leaves[NumThreads] = mcts.find_leaf(*game);
-        std::vector<ValueType> vs;
-        std::vector<std::vector<float>> pis;
-        evaluate(leaves, vs, pis);
 
-        for (int i = 0; i < NumThreads; i++) {
-          specs[i]->process_result(pis[i], vs[i]);
+        {
+          std::vector<ValueType> vs;
+          at::Tensor pis;
+          evaluate(leaves, vs, pis);
+
+          for (int i = 0; i < NumThreads; i++) {
+            const float* pi = pis.data_ptr<float>() + base->sp * i;
+            specs[i]->process_result(pi, base->sp, vs[i]);
+          }
+          const float* pi = pis.data_ptr<float>() + base->sp * NumThreads;
+          mcts.process_result(pi, base->sp, vs[NumThreads]);
         }
-        mcts.process_result(pis[NumThreads], vs[NumThreads]);
 
 #ifdef ALPHAZERO_SHOW_ACTION_CNT
         // TODO: maybe print per time
         if (iter % 64 == 0) {
-          for (int i = 0; i <= NumThreads; i++) printf("\33[F");
+          for (int i = 0; i < NumThreads + 1; i++) printf("\33[F");
           for (int i = 0; i < NumThreads; i++) {
             auto counts = specs[i]->counts_map();
             auto root_value = specs[i]->root_value();
