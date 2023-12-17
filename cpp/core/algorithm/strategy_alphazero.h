@@ -1,15 +1,7 @@
 #pragma once
 
-#pragma warning(push, 0)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-result"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#include <torch/script.h>
-#include <torch/torch.h>
-#pragma GCC diagnostic pop
-#pragma warning(pop)
-
 #include "core/util/common.h"
+#include "core/util/pytorch.h"
 
 namespace alphazero {
 
@@ -556,8 +548,8 @@ class Algorithm {
     sv = size_v;
     sp = size_pi;
 
-    // undocumented API that looks like it can be used to optimize the model
-    // torch::jit::optimize_for_inference(model);
+    // undocumented API that may be useful to optimize the model
+    torch::jit::optimize_for_inference(model);
 
     // warm up the model
     std::cout << "Warming up." << std::endl;

@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
-#include <torch/torch.h>
 
 #include "core/util/common.h"
+#include "core/util/pytorch.h"
 
 TEST(LibtorchCpuBasicTest, Simple) {
   std::cout << "hello from libtorch!" << std::endl;
@@ -49,4 +49,15 @@ TEST(LibtorchCpuBasicTest, Grad2) {
   auto grad_y = torch::autograd::grad({z}, {y})[0];
   // grad of exp(x) * y + sigmoid(x) should be exp(x)
   ASSERT_FLOAT_EQ(grad_y.item<float>(), e);
+}
+
+TEST(LibtorchCpuBasicTest, LoadSave) {
+  auto filename = "__tmp_tensor_LibtorchCpuBasicTest_LoadSave.pt";
+  auto tensor = torch::randn({1, 2, 3, 5, 24});
+
+  torch::pickle_save(tensor, filename);
+  auto tensor2 = torch::pickle_load(filename).toTensor();
+  ASSERT_TRUE(tensor.equal(tensor2));
+
+  std::remove(filename);
 }
