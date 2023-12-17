@@ -85,7 +85,7 @@ game_quoridor_test = executable(
   'cmd/test_game_quoridor.cpp',
   dependencies : [gtest, torch_dep, torch_cpu_dep, c10_dep],
 )
-test('game_quoridor', game_quoridor_test)
+test('game_quoridor', game_quoridor_test, workdir : meson.source_root())
 
 
 ##################
@@ -99,3 +99,13 @@ algorithm_alphazero_mcts_node_test = executable(
 )
 test('algorithm_alphazero_mcts_node', algorithm_alphazero_mcts_node_test, workdir : meson.source_root(), timeout : 300)
 
+
+##################
+# Other executables
+##################
+
+selfplay_quoridor = executable(
+  'selfplay_quoridor',
+  'misc/selfplay_quoridor.cpp',
+  dependencies : [torch_dep, torch_cpu_dep, c10_dep],
+)

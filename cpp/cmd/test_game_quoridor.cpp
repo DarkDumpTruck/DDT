@@ -2,6 +2,7 @@
 
 #include "core/examples/game_quoridor.h"
 #include "gtest/gtest.h"
+#include "torch/torch.h"
 
 using namespace Quoridor;
 
@@ -519,6 +520,34 @@ TEST(QuoridorTest, CopyTest2) {
   for (auto& g : games) {
     EXPECT_EQ(g->Hash(), game.Hash());
   }
+}
+
+/* Test case #19:
+ * This tests the Canonicalize() function.
+ */
+TEST(QuoridorTest, CanonicalizeTest) {
+  if (WIDTH != 9 || HEIGHT != 9) {
+    GTEST_SKIP();
+  }
+
+  GameState game;
+  for(int i = 0; i < 20; i++) {
+    auto valid_moves = game.Valid_moves();
+    int j = i * 20;
+    while(!valid_moves[j % NUM_ACTIONS]) j++;
+    game.Move(j % NUM_ACTIONS);
+  }
+  auto canonicalized = torch::zeros({1, CANONICAL_SHAPE[0], CANONICAL_SHAPE[1],
+                                     CANONICAL_SHAPE[2]});
+  game.Canonicalize(canonicalized.data_ptr<float>());
+
+  std::ifstream in("testdata/quoridor_canonical_testcase.pt", std::ios::binary);
+  EXPECT_TRUE(in.is_open()) << "Cannot open testdata/quoridor_canonical_testcase.pt";
+  std::vector<char> buffer(std::istreambuf_iterator<char>(in), {});
+
+  auto expected = torch::pickle_load(buffer).toTensor();
+
+  EXPECT_TRUE(torch::allclose(canonicalized, expected));
 }
 
 /* Test case #99:

@@ -3,11 +3,14 @@
 #include "core/util/processor_count.h"
 
 constexpr int NumParallel = 4;
-constexpr int NumIterations = 10000;
 
-int main() {
+int main(int argc, const char** argv) {
+  int NumIterations = 20000;
+  if (argc == 3 && strcmp(argv[1], "-i") == 0) {
+    NumIterations = std::atoi(argv[2]);
+  }
   torch::set_num_threads(ProcessorCnt);
-  alphazero::Algorithm<Quoridor::GameState, NumParallel> algorithm(
+  alphazero::Algorithm<Quoridor::GameState, NumParallel - 1> algorithm(
       "testdata/quoridor_baseline.pt");
   Quoridor::GameState game;
   algorithm.init(Quoridor::CANONICAL_SHAPE, Quoridor::NUM_PLAYERS + 1,
@@ -16,12 +19,12 @@ int main() {
 
   auto start = std::chrono::high_resolution_clock::now();
   context->step(/*iterations=*/NumIterations);
-  context->best_move();
+  auto best_move = context->best_move();
   auto end = std::chrono::high_resolution_clock::now();
   auto duration =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
           .count();
-  std::cout << "\nTime: " << duration << "ms\nIteration: " << NumIterations
+  std::cout << "\nTime: " << duration << "ms\nIteration: " << NumIterations << "\nBest move: " << Quoridor::action_to_string(best_move)
             << std::endl;
   return 0;
 }
