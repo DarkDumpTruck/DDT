@@ -61,7 +61,7 @@ jobs:
     - name: Build and Test with Meson
       working-directory: cpp
       run: |
-            meson setup -Dcpp_args="-ffast-math -march=native" build --buildtype=release
+            meson setup -Dcpp_args="-ffast-math -march=native -Wno-unknown-pragmas" build --buildtype=release
             meson compile -C build
             meson test --print-errorlogs --repeat=10 -C build
       shell: bash

@@ -1,8 +1,8 @@
 #include <iostream>
 
 #include "core/examples/game_quoridor.h"
+#include "core/util/pytorch.h"
 #include "gtest/gtest.h"
-#include "torch/torch.h"
 
 using namespace Quoridor;
 
@@ -540,12 +540,8 @@ TEST(QuoridorTest, CanonicalizeTest) {
   auto canonicalized = torch::zeros({1, CANONICAL_SHAPE[0], CANONICAL_SHAPE[1],
                                      CANONICAL_SHAPE[2]});
   game.Canonicalize(canonicalized.data_ptr<float>());
-
-  std::ifstream in("testdata/quoridor_canonical_testcase.pt", std::ios::binary);
-  EXPECT_TRUE(in.is_open()) << "Cannot open testdata/quoridor_canonical_testcase.pt";
-  std::vector<char> buffer(std::istreambuf_iterator<char>(in), {});
-
-  auto expected = torch::pickle_load(buffer).toTensor();
+  
+  auto expected = torch::pickle_load("testdata/quoridor_canonical_testcase.pt").toTensor();
 
   EXPECT_TRUE(torch::allclose(canonicalized, expected));
 }
