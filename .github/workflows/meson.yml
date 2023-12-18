@@ -7,6 +7,8 @@ on:
 env:
   cmake_version: 3.28.1
   libtorch_version: 2.1.2
+  python_version: 3.12
+  cpp_compiler_linux: g++-13
 
 jobs:
   build-on-ubuntu:
@@ -16,7 +18,7 @@ jobs:
       run: |
             # sudo apt-get update
             # sudo apt-get upgrade -y
-            sudo apt-get install gcc-10 g++-10 -y
+            sudo apt-get install g++-13 -y
             sudo apt-get remove cmake -y
             wget -O cmake.sh https://github.com/Kitware/CMake/releases/download/v${{ env.cmake_version }}/cmake-${{ env.cmake_version }}-linux-x86_64.sh
             sudo mkdir /opt/cmake
@@ -30,7 +32,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
+        python-version: ${{ env.python_version }}
         check-latest: true
   
     - name: Setup libtorch-cpu
@@ -66,15 +68,13 @@ jobs:
             meson test --print-errorlogs --repeat=10 -C build
       shell: bash
       env:
-       CC:   gcc-10
-       CXX:  g++-10
+       CXX:  ${{ env.cpp_compiler_linux }}
       
     - name: Run extra tests
       run: bash scripts/run-tests-with-multiple-quoridor-board-size.sh
       shell: bash
       env:
-       CC:   gcc-10
-       CXX:  g++-10
+       CXX:  ${{ env.cpp_compiler_linux }}
 
     - name: Upload meson-logs
       uses: actions/upload-artifact@v3
@@ -94,7 +94,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
+        python-version: ${{ env.python_version }}
         check-latest: true
   
     - name: Setup mason
