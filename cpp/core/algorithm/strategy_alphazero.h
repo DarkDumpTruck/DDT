@@ -355,14 +355,14 @@ class Algorithm {
               /*cpuct=*/CPUCT,
               /*num_moves=*/game->Num_actions(),
               /*epsilon=*/0,
-              /*root_policy_temp=*/1.4,
+              /*root_policy_temp=*/1.4f,
               /*fpu_reduction=*/FPU_REDUCTION) {
       for (int i = 0; i < SpecThreadCount; ++i) {
         specs[i] = std::make_unique<MCTS<GameState>>(
             /*cpuct=*/CPUCT,
             /*num_moves=*/game->Num_actions(),
             /*epsilon=*/0,
-            /*root_policy_temp=*/1.4,
+            /*root_policy_temp=*/1.4f,
             /*fpu_reduction=*/FPU_REDUCTION);
       }
     }
