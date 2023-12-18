@@ -35,6 +35,17 @@ test('cli', cli)
 
 
 ##################
+# Benchmark for Algorithms
+##################
+
+benchmark_alphazero = executable(
+  'benchmark_alphazero',
+  'cmd/benchmark_alphazero.cpp',
+  dependencies : [torch_dep, torch_cpu_dep, c10_dep],
+)
+
+
+##################
 # Tests for Core
 ##################
 
@@ -86,5 +97,5 @@ algorithm_alphazero_mcts_node_test = executable(
   'cmd/test_alphazero_mcts_node.cpp',
   dependencies : [gtest, torch_dep, torch_cpu_dep, c10_dep],
 )
-test('algorithm_alphazero_mcts_node', algorithm_alphazero_mcts_node_test, workdir : meson.source_root())
+test('algorithm_alphazero_mcts_node', algorithm_alphazero_mcts_node_test, workdir : meson.source_root(), timeout : 300)
 
