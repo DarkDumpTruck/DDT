@@ -33,9 +33,13 @@ struct ValueType {
     assert(index == 0 || index == 1);
     return index == 0 ? v : 1 - v;
   }
+  template <class T0, class T1> void set(T0 a, T1 b);
   void set(int index, float v_) {
     assert(index == 0 || index == 1);
     v = index == 0 ? v_ : 1 - v_;
+  }
+  void set(float v0, float v1) {
+    v = v0 / (v0 + v1);
   }
 };
 
