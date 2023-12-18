@@ -5,8 +5,8 @@ on:
     branches: [ main ]
 
 env:
-  cmake_version: 3.27.7
-  libtorch_version: 2.1.1
+  cmake_version: 3.28.1
+  libtorch_version: 2.1.2
 
 jobs:
   build-on-ubuntu:
