@@ -1,7 +1,5 @@
 #pragma once
 
-#define ALPHAZERO_SHOW_ACTION_CNT 6
-
 #pragma warning(push, 0)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-result"
@@ -92,7 +90,7 @@ struct Node {
     auto sqrt_n = std::sqrt((float)n);
     auto best_i = 0;
     auto best_uct = children.at(0).uct(sqrt_n, cpuct, fpu_value);
-    for (int i = 1; i < children.size(); ++i) {
+    for (size_t i = 1; i < children.size(); ++i) {
       auto uct = children.at(i).uct(sqrt_n, cpuct, fpu_value);
       if (uct > best_uct) {
         best_uct = uct;
@@ -132,8 +130,6 @@ class MCTS {
 
     while (current_->n > 0 && !current_->ended) {
       path_.push_back(current_);
-      bool player = current_->player;
-
       auto fpu_reduction = fpu_reduction_;
       // root fpu is half-ed.
       if (current_ == &root_) {
@@ -162,7 +158,7 @@ class MCTS {
 
     if (current_->n == 0) {
       current_->player = leaf->Current_player();
-      if (current_->ended = leaf->End()) {
+      if ((bool)(current_->ended = leaf->End())) {
         current_->value = ValueType(leaf->Current_player(),
                                     leaf->Winner() == leaf->Current_player());
       }
@@ -275,14 +271,13 @@ class MCTS {
     auto counts = this->counts();
     std::vector<float> probs(num_moves_, 0);
 
-    if (temp == 0) {
+    if (temp < 1e-7f) {
       auto best_moves = std::vector<int>{0};
       auto best_count = counts[0];
       for (auto m = 1; m < num_moves_; ++m) {
         if (counts[m] > best_count) {
           best_count = counts[m];
-          best_moves.clear();
-          best_moves.push_back(m);
+          best_moves = {m};
         } else if (counts[m] == best_count) {
           best_moves.push_back(m);
         }
@@ -318,7 +313,7 @@ class MCTS {
     static auto re = std::default_random_engine(0);
     auto choice = dist(re);
     auto sum = 0.0F;
-    for (int m = 0; m < p.size(); ++m) {
+    for (size_t m = 0; m < p.size(); ++m) {
       sum += p[m];
       if (sum > choice) {
         return m;
@@ -326,7 +321,7 @@ class MCTS {
     }
     // Due to floating point error we didn't pick a move.
     // Pick the last valid move.
-    for (int m = p.size() - 1; m >= 0; --m) {
+    for (size_t m = p.size() - 1; m >= 0; --m) {
       if (p[m] > 0) {
         return m;
       }
@@ -352,10 +347,10 @@ class MCTS {
   float fpu_reduction_;
 };
 
-template <class GameState, int NumThreads>
+template <class GameState, int SpecThreadCount>
 class Algorithm {
  public:
-  Algorithm(std::string model_path_) : model_path(model_path_), device("cpu") {}
+  Algorithm(std::string model_path_) : device("cpu"), model_path(model_path_) {}
 
   struct Context {
     Context(std::unique_ptr<GameState> game_)
@@ -366,7 +361,7 @@ class Algorithm {
               /*epsilon=*/0,
               /*root_policy_temp=*/1.4,
               /*fpu_reduction=*/FPU_REDUCTION) {
-      for (int i = 0; i < NumThreads; ++i) {
+      for (int i = 0; i < SpecThreadCount; ++i) {
         specs[i] = std::make_unique<MCTS<GameState>>(
             /*cpuct=*/CPUCT,
             /*num_moves=*/game->Num_actions(),
@@ -378,9 +373,9 @@ class Algorithm {
 
     template <size_t N>
     void evaluate(const std::array<std::unique_ptr<GameState>, N>& games,
-                  std::vector<ValueType>& vs, at::Tensor& pis) {
+                  at::Tensor& vs, at::Tensor& pis) {
       auto input = torch::zeros({(int)N, base->d1, base->d2, base->d3});
-      for (int i = 0; i < N; ++i) {
+      for (int i = 0; i < (int)N; ++i) {
         float* buffer =
             input.data_ptr<float>() + base->d1 * base->d2 * base->d3 * i;
         games[i]->Canonicalize(buffer);
@@ -388,14 +383,8 @@ class Algorithm {
 
       std::vector<torch::jit::IValue> inputs = {input.to(base->device)};
       auto outputs = base->model.forward(inputs).toTuple();
-      auto tensor_v = torch::exp(outputs->elements()[0].toTensor()).cpu();
+      vs = torch::exp(outputs->elements()[0].toTensor()).cpu();
       pis = torch::exp(outputs->elements()[1].toTensor()).cpu();
-
-      vs.clear();
-      for (auto i = 0; i < N; ++i) {
-        float* current_tensor_v = tensor_v.data_ptr<float>() + base->sv * i;
-        vs.emplace_back(current_tensor_v[0], current_tensor_v[1]);
-      }
     }
 
     void evaluate(const GameState& game, ValueType& v, at::Tensor& pi) {
@@ -415,7 +404,7 @@ class Algorithm {
       std::unique_lock lock(base->model_mutex);
 
       // initalize spec trees with most p-value moves.
-      {
+      if (SpecThreadCount > 0) {
         ValueType v;
         at::Tensor tensor_pi;
         mcts.find_leaf(*game);
@@ -424,19 +413,19 @@ class Algorithm {
 
         auto& children = mcts.root_children();
         std::vector<int> idx(children.size());
-        for (int i = 0; i < idx.size(); i++) idx[i] = children[i].move;
+        for (int i = 0; i < (int)idx.size(); i++) idx[i] = children[i].move;
         std::sort(idx.begin(), idx.end(),
                   [&](int a, int b) { return pi[a] > pi[b]; });
         children.erase(
-            std::remove_if(children.begin(), children.end(),
-                           [&](const alphazero::Node& node) {
-                             return std::find(
-                                        idx.begin(), idx.begin() + NumThreads,
-                                        node.move) != idx.begin() + NumThreads;
-                           }),
+            std::remove_if(
+                children.begin(), children.end(),
+                [&](const alphazero::Node& node) {
+                  return std::find(idx.begin(), idx.begin() + SpecThreadCount,
+                                   node.move) != idx.begin() + SpecThreadCount;
+                }),
             children.end());
         mcts.process_result(pi, base->sp, v);
-        for (int i = 0; i < NumThreads; i++) {
+        for (int i = 0; i < SpecThreadCount; i++) {
           specs[i]->root_children().emplace_back(idx[i]);
           specs[i]->root_.player = game->Current_player();
           specs[i]->process_result(pi, base->sp, v);
@@ -445,30 +434,31 @@ class Algorithm {
 
       int iter = 0;
       for (; iter < iterations; iter++) {
-        std::array<std::unique_ptr<GameState>, NumThreads + 1> leaves;
-        for (int i = 0; i < NumThreads; i++) {
+        std::array<std::unique_ptr<GameState>, SpecThreadCount + 1> leaves;
+        for (int i = 0; i < SpecThreadCount; i++) {
           leaves[i] = specs[i]->find_leaf(*game);
         }
-        leaves[NumThreads] = mcts.find_leaf(*game);
+        leaves[SpecThreadCount] = mcts.find_leaf(*game);
 
         {
-          std::vector<ValueType> vs;
-          at::Tensor pis;
+          at::Tensor vs, pis;
           evaluate(leaves, vs, pis);
 
-          for (int i = 0; i < NumThreads; i++) {
+          for (int i = 0; i < SpecThreadCount; i++) {
             const float* pi = pis.data_ptr<float>() + base->sp * i;
-            specs[i]->process_result(pi, base->sp, vs[i]);
+            const float* v = vs.data_ptr<float>() + base->sv * i;
+            specs[i]->process_result(pi, base->sp, ValueType(v[0], v[1]));
           }
-          const float* pi = pis.data_ptr<float>() + base->sp * NumThreads;
-          mcts.process_result(pi, base->sp, vs[NumThreads]);
+          const float* pi = pis.data_ptr<float>() + base->sp * SpecThreadCount;
+          const float* v = vs.data_ptr<float>() + base->sv * SpecThreadCount;
+          mcts.process_result(pi, base->sp, ValueType(v[0], v[1]));
         }
 
 #ifdef ALPHAZERO_SHOW_ACTION_CNT
         // TODO: maybe print per time
         if (iter % 64 == 0) {
-          for (int i = 0; i < NumThreads + 1; i++) printf("\33[F");
-          for (int i = 0; i < NumThreads; i++) {
+          for (int i = 0; i < SpecThreadCount + 1; i++) printf("\33[F");
+          for (int i = 0; i < SpecThreadCount; i++) {
             auto counts = specs[i]->counts_map();
             auto root_value = specs[i]->root_value();
             printf("\nAction: [%s], Winrate:  %.4f",
@@ -490,14 +480,14 @@ class Algorithm {
           }
           auto root_value = mcts.root_value();
           printf("Winrate: %.4f", root_value);
-#endif
         }
+#endif
       }
     }
 
     ActionType best_move() {
       float best_value = 0;
-      ActionType best_action;
+      ActionType best_action = 0;
       for (const auto& c : mcts.root_.children) {
         if (c.n > 0 && c.q > best_value) {
           best_value = c.q;
@@ -520,10 +510,22 @@ class Algorithm {
       return best_move();
     }
 
+    at::Tensor get_policy(float temperature) {
+      auto probs = mcts.probs(temperature);
+      at::Tensor tensor = torch::from_blob(probs.data(), {probs.size()});
+      return tensor;
+    }
+
+    at::Tensor get_canonicalized() {
+      auto input = torch::zeros({1, base->d1, base->d2, base->d3});
+      game->Canonicalize(input.data_ptr<float>());
+      return input;
+    }
+
     std::unique_ptr<GameState> game;
     Algorithm* base;
     MCTS<GameState> mcts;
-    std::array<std::unique_ptr<MCTS<GameState>>, NumThreads> specs;
+    std::array<std::unique_ptr<MCTS<GameState>>, SpecThreadCount> specs;
   };
 
   std::unique_ptr<Context> compute(const GameState& game) {
@@ -543,7 +545,8 @@ class Algorithm {
 
     model = torch::jit::load(model_path, device);
     if (model.is_training()) {
-      std::cout << "Warning: Model is in training mode." << std::endl;
+      std::cout << "Warning: Model is in training mode. Calling eval()."
+                << std::endl;
       model.eval();
     }
 
@@ -552,6 +555,9 @@ class Algorithm {
     d3 = dimentions[2];
     sv = size_v;
     sp = size_pi;
+
+    // undocumented API that looks like it can be used to optimize the model
+    // torch::jit::optimize_for_inference(model);
 
     // warm up the model
     std::cout << "Warming up." << std::endl;
