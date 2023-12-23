@@ -531,17 +531,43 @@ TEST(QuoridorTest, CanonicalizeTest) {
   }
 
   GameState game;
-  for(int i = 0; i < 20; i++) {
+  for (int i = 0; i < 20; i++) {
     auto valid_moves = game.Valid_moves();
     int j = i * 20;
-    while(!valid_moves[j % NUM_ACTIONS]) j++;
+    while (!valid_moves[j % NUM_ACTIONS]) j++;
     game.Move(j % NUM_ACTIONS);
   }
-  auto canonicalized = torch::zeros({1, CANONICAL_SHAPE[0], CANONICAL_SHAPE[1],
-                                     CANONICAL_SHAPE[2]});
+  auto canonicalized = torch::zeros(
+      {1, CANONICAL_SHAPE[0], CANONICAL_SHAPE[1], CANONICAL_SHAPE[2]});
   game.Canonicalize(canonicalized.data_ptr<float>());
-  
-  auto expected = torch::pickle_load("testdata/quoridor_canonical_testcase.pt").toTensor();
+
+  EXPECT_EQ(game.ToString(),
+            "Current Player: O\n"
+            "    1   2   3   4   5   6   7   8   9 \n"
+            "  +---+---+---+---+---+---+---+---+---+\n"
+            "1 |   |                   |           |\n"
+            "  |   +   +   +---+---+   +---+---+   + i\n"
+            "2 |   |           |       |           |\n"
+            "  |---+---+   +   +   +---+---+   +   + j\n"
+            "3 |               |                   |\n"
+            "  |   +---+---+   +   +   +   +   +   + k\n"
+            "4 | O             |                   |\n"
+            "  |   +   +   +   +   +   +   +   +   + l\n"
+            "5 |           |   |   |           | X |\n"
+            "  |   +---+---+---+---+   +---+---+   + m\n"
+            "6 |       |   |       |       |   |   |\n"
+            "  |---+---+   +   +   +---+---+   +   + n\n"
+            "7 |       |                   |       |\n"
+            "  |   +   +   +   +   +   +   +   +   + o\n"
+            "8 |                                   |\n"
+            "  |   +   +   +   +   +   +   +   +   + p\n"
+            "9 |                                   |\n"
+            "  +---+---+---+---+---+---+---+---+---+\n"
+            "      a   b   c   d   e   f   g   h\n"
+            "walls left = 1, 0\n");
+
+  auto expected =
+      torch::pickle_load("testdata/quoridor_canonical_testcase.pt").toTensor();
 
   EXPECT_TRUE(torch::allclose(canonicalized, expected));
 }

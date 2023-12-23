@@ -1021,10 +1021,8 @@ class GameState {
   }
 
   std::string ToString() const noexcept {
-    std::string out = "Current Player: ";
-    out += (current_player ? "Right" : "Left");
-    out += "\n    1   2   3   4   5   6   7   8   9 \n";
-    out += "  +---+---+---+---+---+---+---+---+---+\n";
+    std::string out = current_player ? "Current Player: X" : "Current Player: O";
+    out += "\n    1   2   3   4   5   6   7   8   9 \n  +---+---+---+---+---+---+---+---+---+\n";
     for (int i = 0; i < 9; i++) {
       out += (char)('1' + i);
       out += " |";
@@ -1060,14 +1058,8 @@ class GameState {
         out += '\n';
       }
     }
-    out += "  +---+---+---+---+---+---+---+---+---+\n";
-    out += "      a   b   c   d   e   f   g   h\n";
-
-    int cnt_x = shortestDistance(board.player0_x(), board.player0_y(), 8);
-    int cnt_y = shortestDistance(board.player1_x(), board.player1_y(), 0);
-
-    out += "walls left = " + std::to_string(board.player0_cnt()) + " , " +
-           std::to_string(board.player1_cnt()) + "\n";
+    out += "  +---+---+---+---+---+---+---+---+---+\n      a   b   c   d   e   f   g   h\n";
+    out += std::format("walls left = {}, {}\n", board.player0_cnt(), board.player1_cnt());
     return out;
   }
 

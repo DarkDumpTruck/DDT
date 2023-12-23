@@ -62,7 +62,7 @@ int main(int argc, const char** argv) {
                   << ", action=" << Quoridor::action_to_string(action)
                   << std::endl;
       } else {
-        putchar('.');
+        std::cout.put('.').flush();
       }
       if constexpr (DEBUG_SHOW_GAMEBOARD) {
         std::cout << game.ToString() << std::endl;
@@ -70,11 +70,11 @@ int main(int argc, const char** argv) {
     }
 
     if (turn == ALPHAZERO_MAX_TURN) {
-      std::cout << "Game is too long, skipped." << std::endl;
+      std::cout << "\nGame is too long, skipped." << std::endl;
       std::cout << game.ToString() << std::endl;
       continue;
     } else {
-      std::cout << "Game finished in " << turn << " turns. Winner is " << game.Winner() << std::endl;
+      std::cout << "\nGame finished in " << turn << " turns. Winner is " << (game.Winner() ? 'X' : 'O') << std::endl;
       std::cout << game.ToString() << std::endl;
     }
 
