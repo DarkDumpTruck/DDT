@@ -17,14 +17,13 @@ int main(int argc, const char** argv) {
                  Quoridor::NUM_ACTIONS);
   auto context = algorithm.compute(game);
 
-  auto start = std::chrono::high_resolution_clock::now();
+  auto start = high_resolution_clock::now();
   context->step(/*iterations=*/NumIterations);
   auto best_move = context->best_move();
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - start)
-          .count();
-  std::cout << "\nTime: " << duration << "ms\nIteration: " << NumIterations << "\nBest move: " << Quoridor::action_to_string(best_move)
+  auto end = high_resolution_clock::now();
+  auto duration = duration_cast<milliseconds>(end - start).count();
+  std::cout << "\nTime: " << duration << "ms\nIteration: " << NumIterations
+            << "\nBest move: " << Quoridor::action_to_string(best_move)
             << std::endl;
   return 0;
 }

@@ -1020,6 +1020,57 @@ class GameState {
     }
   }
 
+  std::string ToString() const noexcept {
+    std::string out = "Current Player: ";
+    out += (current_player ? "Right" : "Left");
+    out += "\n    1   2   3   4   5   6   7   8   9 \n";
+    out += "  +---+---+---+---+---+---+---+---+---+\n";
+    for (int i = 0; i < 9; i++) {
+      out += (char)('1' + i);
+      out += " |";
+      for (int j = 0; j < 9; j++) {
+        if (board.player0_x() == j && board.player0_y() == i) {
+          out += " O ";
+        } else if (board.player1_x() == j && board.player1_y() == i) {
+          out += " X ";
+        } else {
+          out += "   ";
+        }
+        if (j == 8 || board(0, j, i)) {
+          out += '|';
+        } else {
+          out += ' ';
+        }
+      }
+      out += '\n';
+      if (i < 8) {
+        out += "  |";
+        for (int j = 0; j < 9; j++) {
+          if (board(1, j, i)) {
+            out += "---";
+          } else {
+            out += "   ";
+          }
+          if (j < 8) {
+            out += '+';
+          }
+        }
+        out += "+ ";
+        out += (char)('i' + i);
+        out += '\n';
+      }
+    }
+    out += "  +---+---+---+---+---+---+---+---+---+\n";
+    out += "      a   b   c   d   e   f   g   h\n";
+
+    int cnt_x = shortestDistance(board.player0_x(), board.player0_y(), 8);
+    int cnt_y = shortestDistance(board.player1_x(), board.player1_y(), 0);
+
+    out += "walls left = " + std::to_string(board.player0_cnt()) + " , " +
+           std::to_string(board.player1_cnt()) + "\n";
+    return out;
+  }
+
   static std::string action_to_string(ActionType action, bool player) {
     return Quoridor::action_to_string(action, player);
   }

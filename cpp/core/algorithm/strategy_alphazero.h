@@ -264,8 +264,13 @@ class MCTS {
   }
 
   std::vector<float> probs(float temp) const noexcept {
-    auto counts = this->counts();
     std::vector<float> probs(num_moves_, 0);
+    set_probs(probs.data(), temp);
+    return probs;
+  }
+  
+  void set_probs(float* buffer, float temp) const noexcept {
+    auto counts = this->counts();
 
     if (temp < 1e-7f) {
       auto best_moves = std::vector<int>{0};
@@ -280,36 +285,36 @@ class MCTS {
       }
 
       for (auto m : best_moves) {
-        probs[m] = 1.0 / best_moves.size();
+        buffer[m] = 1.0f / best_moves.size();
       }
-      return probs;
-    }
 
-    float sum = 0;
-    for (int i = 0; i < num_moves_; i++) {
-      sum += counts[i];
+    } else {
+      float sum = 0;
+      for (int i = 0; i < num_moves_; i++) {
+        sum += counts[i];
+      }
+      for (int i = 0; i < num_moves_; i++) {
+        buffer[i] = counts[i] / sum;
+      }
+      sum = 0;
+      for (int i = 0; i < num_moves_; i++) {
+        sum += std::pow(buffer[i], 1.0f / temp);
+      }
+      for (int i = 0; i < num_moves_; i++) {
+        buffer[i] = std::pow(buffer[i], 1.0f / temp) / sum;
+      }
     }
-    for (int i = 0; i < num_moves_; i++) {
-      probs[i] = counts[i] / sum;
-    }
-    sum = 0;
-    for (int i = 0; i < num_moves_; i++) {
-      sum += std::pow(probs[i], 1. / temp);
-    }
-    for (int i = 0; i < num_moves_; i++) {
-      probs[i] = probs[i] / sum;
-    }
-    return probs;
   }
 
   int depth() const noexcept { return depth_; }
 
   static ActionType pick_move(const std::vector<float>& p) {
     std::uniform_real_distribution<float> dist{0.0F, 1.0F};
-    static auto re = std::default_random_engine(0);
+    static std::random_device rd{};
+    static std::mt19937 re{rd()};
     auto choice = dist(re);
-    auto sum = 0.0F;
-    for (size_t m = 0; m < p.size(); ++m) {
+    auto sum = 0.0f;
+    for (ActionType m = 0; m < p.size(); ++m) {
       sum += p[m];
       if (sum > choice) {
         return m;
@@ -317,7 +322,7 @@ class MCTS {
     }
     // Due to floating point error we didn't pick a move.
     // Pick the last valid move.
-    for (size_t m = p.size() - 1; m >= 0; --m) {
+    for (ActionType m = p.size() - 1; m >= 0; --m) {
       if (p[m] > 0) {
         return m;
       }
@@ -396,11 +401,11 @@ class Algorithm {
       v.set(current_tensor_v[0], current_tensor_v[1]);
     }
 
-    void step(int iterations) {
+    void step(int iterations, bool root_noise_enabled = false) {
       std::unique_lock lock(base->model_mutex);
 
       // initalize spec trees with most p-value moves.
-      if (SpecThreadCount > 0) {
+      if constexpr (SpecThreadCount > 0) {
         ValueType v;
         at::Tensor tensor_pi;
         mcts.find_leaf(*game);
@@ -447,13 +452,13 @@ class Algorithm {
           }
           const float* pi = pis.data_ptr<float>() + base->sp * SpecThreadCount;
           const float* v = vs.data_ptr<float>() + base->sv * SpecThreadCount;
-          mcts.process_result(pi, base->sp, ValueType(v[0], v[1]));
+          mcts.process_result(pi, base->sp, ValueType(v[0], v[1]), root_noise_enabled);
         }
 
 #ifdef ALPHAZERO_SHOW_ACTION_CNT
         // TODO: maybe print per time
         if (iter % 64 == 0) {
-          for (int i = 0; i < SpecThreadCount + 1; i++) printf("\33[F");
+          // for (int i = 0; i < SpecThreadCount + 1; i++) printf("\33[F");
           for (int i = 0; i < SpecThreadCount; i++) {
             auto counts = specs[i]->counts_map();
             auto root_value = specs[i]->root_value();
@@ -501,21 +506,9 @@ class Algorithm {
       return best_action;
     }
 
-    ActionType select_move() {
-      // TODO: select move based on probability.
-      return best_move();
-    }
-
-    at::Tensor get_policy(float temperature) {
+    ActionType select_move(float temperature) {
       auto probs = mcts.probs(temperature);
-      at::Tensor tensor = torch::from_blob(probs.data(), {probs.size()});
-      return tensor;
-    }
-
-    at::Tensor get_canonicalized() {
-      auto input = torch::zeros({1, base->d1, base->d2, base->d3});
-      game->Canonicalize(input.data_ptr<float>());
-      return input;
+      return MCTS<GameState>::pick_move(probs);
     }
 
     std::unique_ptr<GameState> game;

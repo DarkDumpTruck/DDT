@@ -106,6 +106,6 @@ test('algorithm_alphazero_mcts_node', algorithm_alphazero_mcts_node_test, workdi
 
 selfplay_quoridor = executable(
   'selfplay_quoridor',
-  'misc/selfplay_quoridor.cpp',
+  'misc/alphazero_selfplay_quoridor.cpp',
   dependencies : [torch_dep, torch_cpu_dep, c10_dep],
 )
